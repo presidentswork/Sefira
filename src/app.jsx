@@ -1,9 +1,9 @@
-import { useState } from “react”;
+import { useState } from "react";
 
 const SEFIROT = [
-{ name:“Chesed”,  heb:”\u05d7\u05b6\u05e1\u05b6\u05d3”,     color:”#C8A96E”, quality:“Loving-Kindness” },
-{ name:“Gevurah”, heb:”\u05d2\u05b0\u05d1\u05d5\u05bc\u05e8\u05b8\u05d4”,  color:”#9B6B9B”, quality:“Discipline” },
-{ name:“Tiferet”, heb:”\u05ea\u05b4\u05e4\u05b0\u05d0\u05b6\u05e8\u05b6\u05ea”, color:”#4A8C6F”, quality:“Beauty & Truth” },
+{ name:"Chesed",  heb:”\u05d7\u05b6\u05e1\u05b6\u05d3”,     color:”#C8A96E”, quality:“Loving-Kindness” },
+{ name:"Gevurah", heb:”\u05d2\u05b0\u05d1\u05d5\u05bc\u05e8\u05b8\u05d4”,  color:”#9B6B9B”, quality:“Discipline” },
+{ name:"Tiferet", heb:”\u05ea\u05b4\u05e4\u05b0\u05d0\u05b6\u05e8\u05b6\u05ea”, color:”#4A8C6F”, quality:“Beauty & Truth” },
 { name:“Netzach”, heb:”\u05e0\u05b6\u05e6\u05b7\u05d7”,      color:”#C05A3A”, quality:“Endurance” },
 { name:“Hod”,     heb:”\u05d4\u05d5\u05b9\u05d3”,       color:”#3A7AB5”, quality:“Gratitude” },
 { name:“Yesod”,   heb:”\u05d9\u05b0\u05e1\u05d5\u05b9\u05d3”,     color:”#B8960C”, quality:“Connection” },
