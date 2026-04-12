@@ -2,9 +2,6 @@
   "name": "sefirah",
   "version": "1.0.0",
   "private": true,
-  "engines": {
-    "node": "24.x"
-  },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -18,4 +15,3 @@
     "production": [">0.2%", "not dead", "not op_mini all"],
     "development": ["last 1 chrome version"]
   }
-}
