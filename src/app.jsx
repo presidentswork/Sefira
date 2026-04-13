@@ -389,7 +389,7 @@ export default function App(){
   const todayOmer=getTodayOmer();
   const [day,setDay]=useState(todayOmer||1);
   const [showGrid,setShowGrid]=useState(false);
-  const [showLeshon,setShowLeshon]=useState(true);
+  const [showLeshon,setShowLeshon]=useState(false);
   const [showBracha,setShowBracha]=useState(false);
   const [showMore,setShowMore]=useState(false);
   const wi=Math.floor((day-1)/7),di=(day-1)%7;
