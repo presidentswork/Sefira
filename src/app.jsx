@@ -2,9 +2,51 @@ import React, { useState } from "react";
 
 // ── Geo & sunset logic ──────────────────────────────────────────────────────
 const TZ={"America/New_York":[40.7,-74.0],"America/Chicago":[41.9,-87.6],"America/Denver":[39.7,-104.9],"America/Los_Angeles":[34.1,-118.2],"America/Phoenix":[33.4,-112.1],"America/Anchorage":[61.2,-149.9],"America/Honolulu":[21.3,-157.8],"America/Toronto":[43.7,-79.4],"America/Montreal":[45.5,-73.6],"America/Vancouver":[49.2,-123.1],"America/Sao_Paulo":[-23.5,-46.6],"America/Argentina/Buenos_Aires":[-34.6,-58.4],"Europe/London":[51.5,-0.1],"Europe/Paris":[48.9,2.3],"Europe/Berlin":[52.5,13.4],"Europe/Amsterdam":[52.4,4.9],"Europe/Zurich":[47.4,8.5],"Europe/Brussels":[50.8,4.4],"Europe/Rome":[41.9,12.5],"Europe/Madrid":[40.4,-3.7],"Europe/Moscow":[55.8,37.6],"Asia/Jerusalem":[31.8,35.2],"Asia/Tel_Aviv":[32.1,34.8],"Asia/Kolkata":[28.6,77.2],"Asia/Tokyo":[35.7,139.7],"Asia/Shanghai":[31.2,121.5],"Asia/Dubai":[25.2,55.3],"Asia/Hong_Kong":[22.3,114.2],"Asia/Singapore":[1.4,103.8],"Australia/Sydney":[-33.9,151.2],"Australia/Melbourne":[-37.8,145.0],"Australia/Perth":[-31.9,115.9],"Africa/Johannesburg":[-26.2,28.0],"Africa/Cairo":[30.0,31.2],"Pacific/Auckland":[-36.9,174.8]};
-function getCoords(){const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";if(TZ[tz])return TZ[tz];const key=Object.keys(TZ).find(k=>tz.startsWith(k.split("/")[0]));return key?TZ[key]:[31.8,35.2];}
-function sunsetLocal(lat,lon){const D=new Date(),rad=Math.PI/180,JD=D.getTime()/86400000+2440587.5,n=JD-2451545,L=(280.46+0.9856474*n)%360,g=(357.528+0.9856003*n)%360,lam=L+1.915*Math.sin(g*rad)+0.02*Math.sin(2*g*rad),eps=23.439-0.0000004*n,dec=Math.asin(Math.sin(eps*rad)*Math.sin(lam*rad))/rad,cosH=(Math.cos(90.833*rad)-Math.sin(lat*rad)*Math.sin(dec*rad))/(Math.cos(lat*rad)*Math.cos(dec*rad));if(cosH<-1||cosH>1)return 19.5;const H=Math.acos(cosH)/rad,LMST=(6.697375+0.0657098242*n+12)*15+lon,utc=(360-(LMST%360)+H+180)%360/15;return(utc-D.getTimezoneOffset()/60+24)%24;}
-function getTodayOmer(){const[lat,lon]=getCoords(),ss=sunsetLocal(lat,lon),nf=ss+0.7,now=new Date(),frac=now.getHours()+now.getMinutes()/60,bump=frac>=nf?1:0,cal=new Date(now.getFullYear(),now.getMonth(),now.getDate()+bump),day1=new Date(2026,3,3),d=Math.floor((cal-day1)/86400000)+1;return d>=1&&d<=49?d:null;}
+
+function getCoords(){
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";
+  if(TZ[tz])return TZ[tz];
+  const key=Object.keys(TZ).find(k=>tz.startsWith(k.split("/")[0]));
+  return key?TZ[key]:[31.8,35.2];
+}
+
+// Returns sunset as UTC milliseconds for the given LOCAL calendar date and coords
+function sunsetUTC(lat,lon,localDate){
+  const rad=Math.PI/180;
+  // Use noon UTC of that local calendar date as JD reference
+  const ref=new Date(localDate.getFullYear(),localDate.getMonth(),localDate.getDate(),12,0,0);
+  const JD=ref.getTime()/86400000+2440587.5;
+  const n=JD-2451545.0;
+  const M=(357.5291+0.98560028*n)%360;
+  const C=1.9148*Math.sin(M*rad)+0.02*Math.sin(2*M*rad)+0.0003*Math.sin(3*M*rad);
+  const lam=(M+C+180+102.9372)%360;
+  const dec=Math.asin(Math.sin(lam*rad)*Math.sin(23.45*rad))/rad;
+  const cosH=(Math.sin(-0.833*rad)-Math.sin(lat*rad)*Math.sin(dec*rad))/(Math.cos(lat*rad)*Math.cos(dec*rad));
+  if(cosH<-1||cosH>1)return null;
+  const H=Math.acos(cosH)/rad;
+  const Jtr=2451545.0+0.0009+((-lon/360)%1)+n+0.0053*Math.sin(M*rad)-0.0069*Math.sin(2*lam*rad);
+  const Jset=Jtr+H/360;
+  return(Jset-2440587.5)*86400000;
+}
+
+function getTodayOmer(){
+  const[lat,lon]=getCoords();
+  const now=new Date();
+  // Get local calendar date using Intl (handles DST correctly)
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(now).split("-").map(Number);
+  const localDate=new Date(parts[0],parts[1]-1,parts[2]);
+  // Calculate today's sunset as UTC ms
+  const ss=sunsetUTC(lat,lon,localDate);
+  // Add 42 min (tzeit hakochavim) buffer — nightfall is ~42min after geometric sunset
+  const nightfall=ss?ss+42*60000:null;
+  // If we're past nightfall, we're already in the next Hebrew day
+  const bump=nightfall&&now.getTime()>nightfall?1:0;
+  const calDate=new Date(parts[0],parts[1]-1,parts[2]+bump);
+  const day1=new Date(2026,3,3); // April 3, 2026 — Omer day 1
+  const d=Math.floor((calDate.getTime()-day1.getTime())/86400000)+1;
+  return d>=1&&d<=49?d:null;
+}
 
 // ── Sefirot ─────────────────────────────────────────────────────────────────
 const SEFIROT=[
