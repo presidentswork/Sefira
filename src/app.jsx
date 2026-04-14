@@ -757,12 +757,25 @@ export default function App(){
           </div>
         </div>
 
+        {/* ── Credits ── */}
+        <div style={{
+          marginTop:20, paddingBottom:16,
+          display:"flex", flexDirection:"column", alignItems:"center", gap:6
+        }}>
+          <div style={{fontSize:11,color:dm?"#444":"#C8C4BE",fontFamily:"'Crimson Pro',Georgia,serif",fontStyle:"italic",textAlign:"center"}}>
+            Daily practice content translated by Eliyahu Pereira
+          </div>
+          <div style={{fontSize:11,color:dm?"#3A3A4A":"#D0CCC8",fontFamily:"'Crimson Pro',Georgia,serif",fontStyle:"italic",textAlign:"center"}}>
+            Sefirah teachings adapted from <span style={{fontStyle:"normal",direction:"rtl",display:"inline-block"}}>בְּיָם דַּרְכֶּךָ</span> — B'yam Darkecha
+          </div>
+        </div>
+
       </div>
     </div>
   );
 }
 
-// ── Tree of Life data & component ────────────────────────────────────────────
+
 const TREE_NODES=[
   {id:"keter",   he:"כֶּתֶר",    en:"Keter",   tr:"Crown",          col:1,row:0,color:"#8A8AAA",
    desc:"The highest Sefirah — the divine will before thought or form. The place where the self dissolves into pure being.",
