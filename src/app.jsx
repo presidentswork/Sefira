@@ -10,42 +10,49 @@ function getCoords(){
   return key?TZ[key]:[31.8,35.2];
 }
 
-// Returns sunset as UTC milliseconds for the given LOCAL calendar date and coords
-function sunsetUTC(lat,lon,localDate){
-  const rad=Math.PI/180;
-  // Use noon UTC of that local calendar date as JD reference
-  const ref=new Date(localDate.getFullYear(),localDate.getMonth(),localDate.getDate(),12,0,0);
-  const JD=ref.getTime()/86400000+2440587.5;
-  const n=JD-2451545.0;
-  const M=(357.5291+0.98560028*n)%360;
-  const C=1.9148*Math.sin(M*rad)+0.02*Math.sin(2*M*rad)+0.0003*Math.sin(3*M*rad);
-  const lam=(M+C+180+102.9372)%360;
-  const dec=Math.asin(Math.sin(lam*rad)*Math.sin(23.45*rad))/rad;
-  const cosH=(Math.sin(-0.833*rad)-Math.sin(lat*rad)*Math.sin(dec*rad))/(Math.cos(lat*rad)*Math.cos(dec*rad));
-  if(cosH<-1||cosH>1)return null;
-  const H=Math.acos(cosH)/rad;
-  const Jtr=2451545.0+0.0009+((-lon/360)%1)+n+0.0053*Math.sin(M*rad)-0.0069*Math.sin(2*lam*rad);
-  const Jset=Jtr+H/360;
-  return(Jset-2440587.5)*86400000;
-}
-
 function getTodayOmer(){
   const[lat,lon]=getCoords();
   const now=new Date();
-  // Get local calendar date using Intl (handles DST correctly)
-  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";
-  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(now).split("-").map(Number);
-  const localDate=new Date(parts[0],parts[1]-1,parts[2]);
-  // Calculate today's sunset as UTC ms
-  const ss=sunsetUTC(lat,lon,localDate);
-  // Add 42 min (tzeit hakochavim) buffer — nightfall is ~42min after geometric sunset
-  const nightfall=ss?ss+42*60000:null;
-  // If we're past nightfall, we're already in the next Hebrew day
-  const bump=nightfall&&now.getTime()>nightfall?1:0;
-  const calDate=new Date(parts[0],parts[1]-1,parts[2]+bump);
-  const day1=new Date(2026,3,3); // April 3, 2026 — Omer day 1
-  const d=Math.floor((calDate.getTime()-day1.getTime())/86400000)+1;
-  return d>=1&&d<=49?d:null;
+  const nowMs=now.getTime();
+
+  // Get the user's local calendar date via UTC offset (works in any iframe/sandbox)
+  // getTimezoneOffset() is always available and reflects the user's actual browser timezone
+  const localOffsetMs = -now.getTimezoneOffset() * 60000; // convert minutes to ms, flip sign
+  const localMs = nowMs + localOffsetMs;
+  const localD = new Date(localMs);
+  // Local calendar date parts
+  const y = localD.getUTCFullYear();
+  const m = localD.getUTCMonth();
+  const d = localD.getUTCDate();
+
+  // Calculate sunset UTC for this local calendar date
+  // Use noon UTC of that local calendar date as the JD reference point
+  const noonUTC = Date.UTC(y, m, d, 12, 0, 0);
+  const ss = sunsetUTC_ms(lat, lon, noonUTC);
+  // Nightfall = sunset + 42 minutes
+  const nightfall = ss ? ss + 42*60000 : null;
+  // If past nightfall, we are in the next Hebrew day
+  const bump = nightfall && nowMs > nightfall ? 1 : 0;
+  const calDate = new Date(Date.UTC(y, m, d + bump));
+  const day1 = Date.UTC(2026, 3, 3); // April 3, 2026
+  const dayNum = Math.floor((calDate.getTime() - day1) / 86400000) + 1;
+  return dayNum >= 1 && dayNum <= 49 ? dayNum : null;
+}
+
+function sunsetUTC_ms(lat, lon, noonUTCms){
+  const rad=Math.PI/180;
+  const JD = noonUTCms/86400000 + 2440587.5;
+  const n = JD - 2451545.0;
+  const M = (357.5291 + 0.98560028*n) % 360;
+  const C = 1.9148*Math.sin(M*rad) + 0.02*Math.sin(2*M*rad) + 0.0003*Math.sin(3*M*rad);
+  const lam = (M + C + 180 + 102.9372) % 360;
+  const dec = Math.asin(Math.sin(lam*rad) * Math.sin(23.45*rad)) / rad;
+  const cosH = (Math.sin(-0.833*rad) - Math.sin(lat*rad)*Math.sin(dec*rad)) / (Math.cos(lat*rad)*Math.cos(dec*rad));
+  if(cosH < -1 || cosH > 1) return null;
+  const H = Math.acos(cosH) / rad;
+  const Jtr = 2451545.0 + 0.0009 + ((-lon/360)%1) + n + 0.0053*Math.sin(M*rad) - 0.0069*Math.sin(2*lam*rad);
+  const Jset = Jtr + H/360;
+  return (Jset - 2440587.5) * 86400000;
 }
 
 // ── Sefirot ─────────────────────────────────────────────────────────────────
@@ -341,11 +348,30 @@ function PrayerBlock({title, accent, children, dm=false}){
 
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function App(){
-  const todayOmer = getTodayOmer();
-  const [day, setDay] = useState(todayOmer||1);
+  const [todayOmer, setTodayOmer] = useState(()=>getTodayOmer());
+  const [day, setDay] = useState(()=>getTodayOmer()||1);
   const [showGrid, setShowGrid] = useState(false);
   const prefersDark = typeof window!=="undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   const [dm, setDm] = useState(prefersDark);
+  const [dateStr, setDateStr] = useState(()=>new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}));
+
+  // Keep a ref to todayOmer so the interval can read the latest value without stale closure
+  const todayOmerRef = React.useRef(todayOmer);
+  React.useEffect(()=>{ todayOmerRef.current = todayOmer; },[todayOmer]);
+
+  // Recalculate every 30 seconds — updates at nightfall automatically
+  React.useEffect(()=>{
+    const tick=()=>{
+      const t = getTodayOmer();
+      const current = todayOmerRef.current;
+      setTodayOmer(t);
+      setDateStr(new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}));
+      // Auto-advance displayed day only if user is currently viewing today
+      if(t && t !== current) setDay(prev => prev===current ? t : prev);
+    };
+    const id = setInterval(tick, 30000);
+    return ()=> clearInterval(id);
+  },[]); // empty — intentionally runs once, reads fresh values via ref
 
   const wi = Math.floor((day-1)/7);
   const di = (day-1)%7;
@@ -356,7 +382,6 @@ export default function App(){
   const p = PRACTICE[day-1]||PRACTICE[0];
   const dd = D[day-1]||D[0];
   const wt = WEEK_TEACHING[wi]||WEEK_TEACHING[0];
-  const dateStr = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 
   // Palette
   const cardBg    = dm ? "#1A1A28" : "#FFFFFF";
